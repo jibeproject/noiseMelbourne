@@ -52,10 +52,11 @@ write.csv(landcover.attributes, "../data/processed/landcover_attributes.csv",
 # -----------------------------------------------------------------------------#
 # join attributes and allocate g values
 landcover.table <- read_zipped_GIS(zipfile = "../data/processed/landcover.zip") %>%
+  # comment out the join if table has previously been created and 'g' is being changed
   left_join(read.csv("../data/processed/landcover_attributes.csv"), by = "CLASS") %>%
   mutate(g = case_when(
-    CLASS %in% c("Built up", "Water (fresh / saline)") ~ 0,
-    TRUE                                               ~ 1
+    CLASS %in% c("Built up", "Disturbed ground", "Water (fresh / saline)") ~ 0,
+    TRUE                                                                   ~ 1
   ))
 
 # write the output (overwriting any version previously saved without G values)
