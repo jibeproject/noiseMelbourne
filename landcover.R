@@ -48,15 +48,30 @@ write.csv(landcover.attributes, "../data/processed/landcover_attributes.csv",
           row.names = FALSE)
 
 
-# 2 Read in landcover polygons, join to attributes .... ----
+# 2 Allocate G-values ----
 # -----------------------------------------------------------------------------#
-# Might be better not to do this, or at least not until after added G-codes
-# (don't get too worked up about the size of the table with attributes added - 
-# its 192MB with vs 184MB without)
+# join attributes and allocate g values
 landcover.table <- read_zipped_GIS(zipfile = "../data/processed/landcover.zip") %>%
-  left_join(read.csv("../data/processed/landcover_attributes.csv"), by = "CLASS")
+  left_join(read.csv("../data/processed/landcover_attributes.csv"), by = "CLASS") %>%
+  mutate(g = case_when(
+    CLASS %in% c("Built up", "Water (fresh / saline)") ~ 0,
+    TRUE                                               ~ 1
+  ))
+
+# write the output (overwriting any version previously saved without G values)
+write_zipped_shp(sf.obj = landcover.table, 
+                 shp.name = "landcover",
+                 shp.location = "../data/processed/landcover.zip")
 
 
+# 3 Check areas for each class ----
+# -----------------------------------------------------------------------------#
+landcover.areas <- read_zipped_GIS(zipfile = "../data/processed/landcover.zip") %>%
+  mutate(area_ha = st_area(geometry) / 10000)
 
-
-
+area.summary <- landcover.areas %>%
+  st_drop_geometry() %>%
+  group_by(CLASS) %>%
+  summarise(total_area = as.numeric(sum(area_ha))) %>%
+  ungroup() %>%
+  mutate(area_pct = total_area / sum(total_area) * 100)
