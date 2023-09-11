@@ -1,11 +1,11 @@
 # Using DTP freight volumes, allocate freight to links on an hourly basis
 
-# Approach: [UPDATE IF NECESSARY]
+# Approach:
 # • Process freight demand matrices to find the hourly volumes for each pair
 #   of traffic zones
 #   - Fractional demands are rounded; but if the rounded demands for the four
 #     periods do not equal the rounded daily demand, then the rounded period 
-#     demands are adjusted to match the daily demand  ### TO CONFIRM
+#     demands are adjusted to match the daily demand 
 #   - Each whole number of demand volume is treated as a separate trip
 #   - Randomly allocate each trip to an hour within its demand period
 # • Filter road network to links which are motorway, trunk, primary, 
@@ -18,9 +18,6 @@
 #   - For zones where the centroid is used as the address, only nodes on 
 #     motorway, trunk or primary roads are used (to avoid exaggerated demand
 #     on secondary and tertiary roads)
-#   - Zone centroids outside Melbourne will snap to the closest node within 
-#     the buffered Melbourne region, which is likely to be a major exit
-#     road from Melbourne
 # • For each trip, select random addresses from its origin and destination zones
 #   - If the same node is selected for both origin and destination, but another
 #     selection would be possible (because there is more than one address node in 
@@ -29,14 +26,12 @@
 #   - Trips where there is no choice but to select the same node are 
 #     discarded (for example, if both origin and destination are in the same
 #     zone, and it is a zone  where the centroid is used as the address)
-# • Find the shortest route on the filtered road network for each trip, 
-#   expressed as the path of the links making up the trip
+# • Find the fastest route (using length/freespeed) on the filtered road network 
+#   for each trip, expressed as the path of the links making up the trip
 #   - Where multiple trips share a single pair of O/D nodes, the route is
 #     calculated only once, and the results joined to each trip
 # • Tally the number of trips using each link, for each hour; and sum the hourly
 #   totals for each link to produce daily totals
-
-# NOTES - NETWORK AND ADDRESSES TO BE UPDATED; CONFIRM ROUNDING APPROACH
 
 
 library(dplyr)
@@ -49,8 +44,10 @@ library(parallel)
 library(foreach)
 library(tidyr)  # pivoting
 
-
 dir_walk(path="./functions/",source, recurse=T, type = "file")
+
+PROJECT.CRS <- 28355
+
 
 # 1 Load freight, zones, meshblocks, addresses and network ----
 # -----------------------------------------------------------------------------#
@@ -68,16 +65,20 @@ freight.PM <-
 freight.OP <- 
   read.csv("../data/original/DTP freight/Y2018/HeavyVehicle_OP_Demand_Y2018_RC23v1_05.csv.gz")
 
-
 zones <- read_zipped_GIS(zipfile = "../data/original/DTP freight/_Spatial.zip",
                         file = "/VITM2974_Metro_Reference_v3_AGD66_AMG55.shp") %>%
-  st_transform(28355)
+  st_transform(PROJECT.CRS)
 
-meshblocks <- st_read("../data/processed/mb.sqlite")  # 2016 meshblocks
+meshblocks <- 
+  read_zipped_GIS(zipfile = "../data/original/1270055001_mb_2016_vic_shape.zip") %>%
+  st_transform(PROJECT.CRS)
 
-addresses <- st_read("../data/processed/vic_address.sqlite") %>%
-  # keep only geometry
-  dplyr::select()
+addresses<- read.table("../data/original/VIC_ADDRESS_DEFAULT_GEOCODE_psv.psv",
+                       sep = "|", header = TRUE) %>%
+  # crs is GDA 94 (see section 5.1 of 'G-NAF Product Description.pdf' within
+  # 'nov18_gnaf_pipeseparatedvalue_20181119200719.zip')
+  st_as_sf(coords = c("LONGITUDE", "LATITUDE"), crs = st_crs(4283)) %>%
+  st_transform(PROJECT.CRS)
 
 links <- st_read("../data/processed/network.sqlite", layer = "links") %>%
   # filter to main roads only, tertiary and above
@@ -102,15 +103,10 @@ freight.combined <- freight.AM %>%
   full_join(freight.OP %>%rename(Demand.op = Demand), by = c()) %>%
   mutate(Demand.total = Demand.am + Demand.ip + Demand.pm + Demand.op)
 
-# NOTE - KEEP ONLY 1 OPTION (I prefer option 2)
-# round and filter to non-zero entries (option 1 - basic rounding only, by period)
-freight <- round(freight.combined) %>%
-  filter(Demand.am > 0 | Demand.ip > 0 | Demand.pm > 0 | Demand.op > 0)
-
-# round and filter to non-zero entries (option 2 - adjusted rounding to match daily total)
+# round and filter to non-zero entries
 freight <- adjustedRoundedFreight(freight.combined)
 
-# write/reload (to avoid need to recalculate for option 2)
+# write/reload (to avoid need to recalculate rounding)
 # saveRDS(freight, "../data/processed/adjusted_rounded_freight.rds")
 # freight <- readRDS("../data/processed/adjusted_rounded_freight.rds")
 
@@ -148,7 +144,7 @@ freight.trips <- freight %>%
 freight.meshblock.addresses <- addresses %>%
   # intersect with addresses and filter to commercial, industrial and primary production
   st_intersection(meshblocks) %>%
-  filter(category %in% c("Commercial", "Industrial", "Primary Production")) %>%
+  filter(MB_CAT16 %in% c("Commercial", "Industrial", "Primary Production")) %>%
   # intersect with zones
   st_intersection(zones) %>%
   # remove Z dimension which is present in addresses(so can bind with centroids)
@@ -173,8 +169,7 @@ n.node <- network.nodes$id[st_nearest_feature(freight.meshblock.addresses, netwo
 freight.meshblock.addresses <- cbind(freight.meshblock.addresses, n.node) 
 
 # find nearest nodes for zone centroids where no freight meshblock addresses - 
-# limited to major highways, so (1) zones outside Melbourne snap to main roads, 
-# and (2) zones within Melbourne avoid exaggerating traffic on secondary or 
+# limited to major highways, to avoid exaggerating traffic on secondary or 
 # tertiary roads that may be near centroid
 major.network.links <- network.links %>%
   filter(highway %in% c("motorway", "motorway_link", "trunk", "trunk_link",
@@ -188,7 +183,15 @@ centroid.addresses <- cbind(centroid.addresses, n.node)
 freight.addresses <- bind_rows(freight.meshblock.addresses,
                                centroid.addresses)
 
-# randomly allocate origins and destinations to freight addresses (about an hour)
+# write/reload (to avoid relocating nearest nodes) 
+# saveRDS(freight.addresses, "../data/processed/freight_addd.rds")
+# freight.addresses <- readRDS("../data/processed/freight_trips_nodes.rds")
+
+# write to sqlite for review 
+# st_write(freight.addresses, "../data/processed/freight_addresses.sqlite", 
+#          delete_dsn = TRUE)
+
+# randomly allocate origins and destinations to freight trips (about an hour)
 freight.trips.nodes <- allocateNodes(freight.trips, freight.addresses)
 # freight.trips.nodes <- allocateNodes(freight.trips[1:1000,], freight.addresses)
 
@@ -210,7 +213,9 @@ freight.trip.OD.pairs <- freight.trips.nodes %>%
 # be first; requires weight field)
 g.links <- network.links %>%
   st_drop_geometry() %>%
-  dplyr::select(from_id, to_id, id, is_oneway, weight = length)
+  # weight: time
+  mutate(weight = length/freespeed) %>%
+  dplyr::select(from_id, to_id, id, is_oneway, weight)  # shortest time
 
 g.links.twoway.reversed <- g.links %>%
   filter(is_oneway == 0) %>%
@@ -246,7 +251,7 @@ pb <- txtProgressBar(max = nrow(freight.trip.OD.pairs), style = 3)
 progress <- function(n) setTxtProgressBar(pb, n)
 opts <- list(progress = progress)
 
-# find link id's for shortest route between each OD pair (about 2 hours)
+# find link id's for shortest route between each OD pair (about 10 hours)
 freight.trip.OD.pair.outputs <- 
   foreach(i = 1:nrow(freight.trip.OD.pairs),
   # foreach(i = 1:10,

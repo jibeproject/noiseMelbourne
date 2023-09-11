@@ -25,7 +25,7 @@ adjustedRoundedFreight <- function(freight.combined) {
   # Activate cluster for foreach library
   doSNOW::registerDoSNOW(cluster)
   
-  print(paste("Using parallel processing with", cores, 
+  print(paste(Sys.time(), "| Using parallel processing with", cores, 
               "cores to check whether rounding adjustments are required for", 
               nrow(freight), "rows of freight data"))
 
