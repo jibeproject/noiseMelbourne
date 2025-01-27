@@ -16,9 +16,6 @@ The code requires the following input files, which are available [to authorised 
 |--------------------|----------------------------------------------------------|
 |*data/original/VIC_LANDCOVER_TS.zip* | Victorian Land Cover Time Series data, 2015-19 |
 |*data/processed/region.sqlite* | Region: the study area for the JIBE project    |
-|*data/original/melbourne_buildings.zip* | Melbourne building footprints from Overture Maps |
-|*data/processed/poi.gpkg* | Locations of points of interest                                 |
-|*data/
 
 
 ### `boundaries.R`
