@@ -36,6 +36,7 @@ The code requires the following input files, which are available [to authorised 
 |*data/original/2018-building-footprints.zip* | Footprints for buildings in the City of Melbourne |
 |*data/processed/yarra_buioldings_yarra_building_bed_elevation.tif* | Elevation of buildings in the City of Yarra |
 |*data/original/yarra_buildings/mga55_yarra_1m_dtm.tif* | Digital elevation model for the City of Yarra |
+|*data/original/manningham_building_footprints.zip* | Footprints for buildings in the City of Manningham |
 
 
 

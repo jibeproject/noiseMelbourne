@@ -42,9 +42,19 @@ mb <- read_zipped_GIS(zipfile = "../data/original/1270055001_mb_2016_vic_shape.z
   left_join(read.csv("../data/original/2016 census mesh block counts.csv"),
             by = c("MB_CODE16" = "MB_CODE_2016"))
 
-# City of Melbourne buildings (for height)
+# Buildings for Melbourne, Yarra and Manningham LGAs (for height)
+# Melbourne
 melb.lga.buildings <- read_zipped_GIS(zipfile = "../data/original/2018-building-footprints.zip")
 
+# Yarra
+yarra <- read_zipped_GIS(zipfile = "../data/original/LGAs.zip", 
+                         subpath = "/mga94_55/esrishape/whole_of_dataset/victoria/VMADMIN/") %>%
+  filter(NAME == "YARRA")
+yarra.bed.elevation <- rast("../data/processed/yarra_buildings/yarra_building_bed_elevation.tif")
+yarra.dem <- rast("../data/original/yarra_buildings/mga55_yarra_1m_dtm.tif")
+
+# Manningham
+mann.lga.buildings <- read_zipped_GIS(zipfile = "../data/original/manningham_building_footprints.zip")
 
 # 2 Purpose ----
 # -----------------------------------------------------------------------------#
@@ -138,24 +148,13 @@ buildings.purpose <- overture %>%
 # Then, building height is calculated in the script below as 'bed elevation' minus
 # DEM elevation.
 
-
-# load Yarra LGA
-yarra <- read_zipped_GIS(zipfile = "../data/original/LGAs.zip", 
-                         subpath = "/mga94_55/esrishape/whole_of_dataset/victoria/VMADMIN/") %>%
-  filter(NAME == "YARRA")
-
 # overture building centroids for Yarra
 overture.yarra <- overture %>%
   st_transform(st_crs(yarra)) %>%
   st_filter(yarra, .predicate = st_intersects) %>%
   st_centroid()
 
-# read in yarra bed elevation and dem files (building height is bed elevation
-# less dem elevation)
-yarra.bed.elevation <- rast("../data/processed/yarra_buildings/yarra_building_bed_elevation.tif")
-yarra.dem <- rast("../data/original/yarra_buildings/mga55_yarra_1m_dtm.tif")
-
-# add height to yarra overture centroids
+# add height to yarra overture centroids (bed elevation minus DEM elevation)
 height.values <- terra::extract(yarra.bed.elevation, overture.yarra, method = "bilinear", ID = FALSE) - 
   terra::extract(yarra.dem, overture.yarra, method = "bilinear", ID = FALSE) %>%
   as.data.frame() 
@@ -166,21 +165,25 @@ height.values <- height.values %>%
 
 overture.yarra$yarra_lga_height <- height.values
 
-# add height, if not already specified in Overture data, using City of 
-# Melbourne buildings or City of Yarra buildings (prepared as above)
+# add height, if not already specified in Overture data, using Melbourne, Yarra
+# (prepared as above) or Manningham building height
 buildings.specified.height <- buildings.purpose %>%
   
   # rename height as overture.height
   rename(overture_height = height) %>%
   
-  # join melb.lga.building height
+  # join melb and manningham height
   st_join(melb.lga.buildings %>%
             st_transform(st_crs(buildings.purpose)) %>%
             dplyr::select(melb_lga_height = structure_m),
           join = st_intersects) %>%
+  st_join(mann.lga.buildings %>%
+            st_transform(st_crs(buildings.purpose)) %>%
+            dplyr::select(mann_lga_height = height),
+          join = st_intersects) %>%
 
   # there may be duplicates - if so, keep the one with the largest intersection
-  # area (ie the melb.lga building that contains most of the building)
+  # area (ie the melb or manningham building that contains most of the overture building)
   mutate(area = st_area(.)) %>%
   arrange(id, desc(area)) %>%  # sort by id and area descending
   filter(!duplicated(id))%>%  # keep the first occurrence of each id
@@ -194,9 +197,11 @@ buildings.specified.height <- buildings.purpose %>%
               filter(!is.na(yarra_lga_height) & yarra_lga_height > 0),
             by = "id") %>%
   
-  # height is overture height if specified, or melb_lga_height or yarra_lga_height
+  # height is overture height if specified, or else melb, yarra or manningham height if specified
   mutate(height = ifelse(!is.na(overture_height), overture_height, 
-                         ifelse(!is.na(melb_lga_height), melb_lga_height, yarra_lga_height)))
+                         ifelse(!is.na(melb_lga_height), melb_lga_height, 
+                                ifelse(!is.na(yarra_lga_height), yarra_lga_height, 
+                                       mann_lga_height))))
 
 # # check how many still lack height
 # no.overture.height <- nrow(buildings.specified.height %>% filter(!is.na(overture_height))) /
@@ -204,7 +209,8 @@ buildings.specified.height <- buildings.purpose %>%
 # no.overture.height  # 65.31% have height
 # no.overture.lga.height <- nrow(buildings.specified.height %>% filter(!is.na(height))) /
 #   nrow(buildings.specified.height)
-# no.overture.lga.height  # 66.43% have height [formerly, with melb but not yarra, was 66.05% have height]
+# no.overture.lga.height  # 66.61% have height (compare previous results:
+# # 66.05% with just adding melb; 66.43% with just adding melb and yarra)
 
 # where height not specified, calculate as average of 3 nearest buildings
 
