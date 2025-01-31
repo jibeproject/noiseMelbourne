@@ -32,9 +32,10 @@ The code requires the following input files, which are available [to authorised 
 |*data/original/melbourne_buildings.zip* | Melbourne building footprints from Overture Maps |
 |*data/processed/poi.gpkg* | Locations of points of interest                    |
 |*data/original/1270055001_mb_2016_vic_shape.zip* | ABS 2016 census meshblocks for Victoria |
+|*data/original/2016 census mesh block counts.csv* | ABS 2016 census meshblock population and dwelling counts |
 |*data/original/LGAs.zip* | Local government areas for Victoria                 | 
 |*data/original/2018-building-footprints.zip* | Footprints for buildings in the City of Melbourne |
-|*data/processed/yarra_buioldings_yarra_building_bed_elevation.tif* | Elevation of buildings in the City of Yarra |
+|*data/processed/yarra_buildings/yarra_building_bed_elevation.tif* | Elevation of buildings in the City of Yarra |
 |*data/original/yarra_buildings/mga55_yarra_1m_dtm.tif* | Digital elevation model for the City of Yarra |
 |*data/original/manningham_building_footprints.zip* | Footprints for buildings in the City of Manningham |
 
