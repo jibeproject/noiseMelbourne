@@ -38,6 +38,7 @@ The code requires the following input files, which are available [to authorised 
 |*data/processed/yarra_buildings/yarra_building_bed_elevation.tif* | Elevation of buildings in the City of Yarra |
 |*data/original/yarra_buildings/mga55_yarra_1m_dtm.tif* | Digital elevation model for the City of Yarra |
 |*data/original/manningham_building_footprints.zip* | Footprints for buildings in the City of Manningham |
+|*data/original/GBH2020_150m_GEDI.tif* | Global building footprints as of 2020 from Ma et al, https://figshare.com/articles/dataset/2020_150__/25729248/6* |
 
 
 
