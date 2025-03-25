@@ -294,8 +294,16 @@ buildings.height <- buildings.with.mb.height %>%
 
 # 4 Write output ----
 # -----------------------------------------------------------------------------#
+
+# full output file
 st_write(buildings.height, "../data/processed/melbourne_buildings_processed.sqlite",
          delete_layer = TRUE)
+
+# geojson output file required for silo noise model
+st_write(buildings.height %>%
+           dplyr::select(id, height, use = purpose) %>%
+           st_set_geometry("geometry"),
+         "../data/processed/melBuildings.geojson")
 
 
 # 5 Height descriptives ----

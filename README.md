@@ -59,4 +59,5 @@ The code produces the following output files, which are saved to the `data\proce
 | File               | Content                                                  |
 |--------------------|----------------------------------------------------------|
 |*melbourne_buildings_processed.sqlite* |Building footprints, including purpose and height values |
+|*melBuildings.geojson* |Building footprints (same buildings as *melbourne_buildings_processed.sqlite*, but a more limited set of attributes) |
 
